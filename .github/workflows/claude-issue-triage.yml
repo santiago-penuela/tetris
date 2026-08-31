@@ -1,0 +1,94 @@
+name: Claude Issue Triage
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  triage:
+    # Evita duplicar trabajo con claude.yml, que ya reacciona a issues que mencionan "@claude"
+    if: |
+      !contains(github.event.issue.body, '@claude') &&
+      !contains(github.event.issue.title, '@claude')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Issue Triage
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: >-
+            --allowedTools "Read,Grep,Glob,Bash(gh issue view:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(gh label list:*)"
+          prompt: |
+            Eres el sistema de triage de issues de este repositorio (un Tetris en JavaScript vanilla).
+            El issue #${{ github.event.issue.number }} se acaba de abrir o editar. Analízalo y
+            clasifícalo. Trabaja siempre en español.
+
+            ## Pasos
+
+            1. Lee el issue completo:
+               `gh issue view ${{ github.event.issue.number }} --json title,body,labels,comments`
+            2. Lee `CLAUDE.md` para entender la arquitectura, y luego revisa el código
+               relevante (`game.js`, `index.html`, `style.css`) con Read/Grep/Glob.
+            3. Asigna labels y publica un comentario de diagnóstico (ver abajo).
+
+            ## Labels
+
+            Usa EXCLUSIVAMENTE labels que ya existen en el repo. NO crees labels nuevos.
+            Conjunto permitido y criterio:
+            - `bug` — comportamiento roto o incorrecto del juego.
+            - `enhancement` — funcionalidad nueva o mejora de una existente.
+            - `documentation` — afecta a README, CLAUDE.md o comentarios del código.
+            - `accessibility` — barreras para personas con discapacidad (contraste, navegación
+              por teclado, lectores de pantalla, tamaño de texto).
+            - `question` — falta información o es una consulta, no un reporte accionable.
+            - `duplicate` / `invalid` / `wontfix` — solo con evidencia clara.
+            - `good first issue` — cambio pequeño y aislado, bueno para empezar.
+            - `help wanted` — requiere esfuerzo o conocimiento no trivial.
+
+            Aplica con `gh issue edit ${{ github.event.issue.number }} --add-label "nombre"`.
+            Puedes añadir más de uno. No elimines labels existentes salvo contradicción evidente.
+            Si tienes dudas sobre qué label existe, consulta `gh label list`.
+
+            ## Comentario de diagnóstico
+
+            Publica UN comentario en español con exactamente estas secciones en markdown:
+
+            **Resumen** — 1-2 frases reformulando qué se pide o qué falla.
+            **Tipo y labels aplicados** — cuáles pusiste y por qué, en una línea.
+            **Diagnóstico técnico** — causa probable, apuntando a funciones y líneas concretas
+            (p. ej. `game.js:NN`, funciones como `collide`, `tryRotate`, `clearLines`,
+            `spawn`, `dropInterval`).
+            **Archivos afectados** — lista de archivos que habría que tocar.
+            **Enfoque sugerido** — pasos de alto nivel para resolverlo. NO escribas la
+            implementación ni fragmentos de código completos.
+            **Cómo verificar** — cómo probarlo manualmente en el navegador (no hay tests ni
+            build en este repo).
+            **Información faltante** — preguntas concretas al autor si el issue es ambiguo; en
+            ese caso aplica también el label `question`.
+
+            Cierra el comentario con esta nota literal:
+            "_Diagnóstico automático generado por Claude. Para pedir la implementación, comenta
+            `@claude` en este issue._"
+
+            Si ya existe un comentario de diagnóstico previo tuyo (el issue fue editado),
+            actualízalo con `gh issue comment ${{ github.event.issue.number }} --edit-last`
+            en lugar de crear uno nuevo. Si no, créalo con
+            `gh issue comment ${{ github.event.issue.number }} --body "..."`.
+
+            ## Restricciones
+
+            - NO modifiques código, NO crees ramas ni pull requests.
+            - Tu único output son labels + un comentario de diagnóstico.
