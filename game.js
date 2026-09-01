@@ -27,6 +27,8 @@ const PIECES = [
 ];
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
+const LIGHTNING_EVERY = 5;
+const LIGHTNING_BONUS = 150;
 
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
@@ -39,8 +41,10 @@ const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
+const aimBanner = document.getElementById('aim-banner');
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+let pendingLightning, lightningMilestone, aiming, aimX, aimY;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -93,6 +97,19 @@ function merge() {
         board[current.y + r][current.x + c] = current.shape[r][c];
 }
 
+function registerClearedLines(cleared) {
+  if (!cleared) return;
+  lines += cleared;
+  score += (LINE_SCORES[cleared] || 0) * level;
+  level = Math.floor(lines / 10) + 1;
+  dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+  if (Math.floor(lines / LIGHTNING_EVERY) > lightningMilestone) {
+    lightningMilestone = Math.floor(lines / LIGHTNING_EVERY);
+    pendingLightning = true;
+  }
+  updateHUD();
+}
+
 function clearLines() {
   let cleared = 0;
   for (let r = ROWS - 1; r >= 0; r--) {
@@ -103,13 +120,18 @@ function clearLines() {
       r++;
     }
   }
-  if (cleared) {
-    lines += cleared;
-    score += (LINE_SCORES[cleared] || 0) * level;
-    level = Math.floor(lines / 10) + 1;
-    dropInterval = Math.max(100, 1000 - (level - 1) * 90);
-    updateHUD();
-  }
+  registerClearedLines(cleared);
+}
+
+function applyLightning(x, y) {
+  const rowWasFull = board[y].every(v => v !== 0);
+  for (let r = 0; r < ROWS; r++) board[r][x] = 0;
+  board.splice(y, 1);
+  board.unshift(new Array(COLS).fill(0));
+  score += LIGHTNING_BONUS * level;
+  if (rowWasFull) registerClearedLines(1);
+  else updateHUD();
+  clearLines();
 }
 
 function ghostY() {
@@ -138,7 +160,12 @@ function softDrop() {
 function lockPiece() {
   merge();
   clearLines();
-  spawn();
+  if (pendingLightning) {
+    pendingLightning = false;
+    startAiming();
+  } else {
+    spawn();
+  }
 }
 
 function spawn() {
@@ -149,6 +176,27 @@ function spawn() {
     return;
   }
   drawNext();
+}
+
+function startAiming() {
+  aiming = true;
+  aimX = Math.floor(COLS / 2);
+  aimY = ROWS - 1;
+  dropAccum = 0;
+  aimBanner.classList.remove('hidden');
+}
+
+function fireLightning() {
+  aiming = false;
+  aimBanner.classList.add('hidden');
+  applyLightning(aimX, aimY);
+  dropAccum = 0;
+  if (pendingLightning) {
+    pendingLightning = false;
+    startAiming();
+  } else {
+    spawn();
+  }
 }
 
 function updateHUD() {
@@ -197,8 +245,14 @@ function draw() {
 
   if (gameOver) return;
 
+  if (aiming) {
+    drawAimCross();
+    return;
+  }
+
   // ghost
   const gy = ghostY();
+
   for (let r = 0; r < current.shape.length; r++)
     for (let c = 0; c < current.shape[r].length; c++)
       if (current.shape[r][c])
@@ -208,6 +262,23 @@ function draw() {
   for (let r = 0; r < current.shape.length; r++)
     for (let c = 0; c < current.shape[r].length; c++)
       drawBlock(ctx, current.x + c, current.y + r, current.shape[r][c], BLOCK);
+}
+
+function drawAimCross() {
+  const markCell = (c, r, fill, width) => {
+    ctx.fillStyle = fill;
+    ctx.fillRect(c * BLOCK, r * BLOCK, BLOCK, BLOCK);
+    ctx.strokeStyle = 'rgba(22, 22, 32, 0.9)';
+    ctx.lineWidth = width;
+    ctx.strokeRect(c * BLOCK + width / 2, r * BLOCK + width / 2, BLOCK - width, BLOCK - width);
+  };
+
+  const CROSS = 'rgba(160, 164, 178, 0.5)';
+  for (let c = 0; c < COLS; c++) if (c !== aimX) markCell(c, aimY, CROSS, 1);
+  for (let r = 0; r < ROWS; r++) if (r !== aimY) markCell(aimX, r, CROSS, 1);
+
+  const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 180);
+  markCell(aimX, aimY, `rgba(245, 245, 66, ${pulse.toFixed(2)})`, 2);
 }
 
 function drawNext() {
@@ -231,7 +302,7 @@ function endGame() {
 }
 
 function togglePause() {
-  if (gameOver) return;
+  if (gameOver || aiming) return;
   paused = !paused;
   if (!paused) {
     lastTime = performance.now();
@@ -247,6 +318,7 @@ function togglePause() {
 function loop(ts) {
   const dt = ts - lastTime;
   lastTime = ts;
+  if (aiming) { draw(); animId = requestAnimationFrame(loop); return; }
   dropAccum += dt;
   if (dropAccum >= dropInterval) {
     dropAccum = 0;
@@ -270,11 +342,15 @@ function init() {
   gameOver = false;
   dropInterval = 1000;
   dropAccum = 0;
+  pendingLightning = false;
+  lightningMilestone = 0;
+  aiming = false;
   lastTime = performance.now();
   next = randomPiece();
   spawn();
   updateHUD();
   overlay.classList.add('hidden');
+  aimBanner.classList.add('hidden');
   cancelAnimationFrame(animId);
   animId = requestAnimationFrame(loop);
 }
@@ -282,6 +358,18 @@ function init() {
 document.addEventListener('keydown', e => {
   if (e.code === 'KeyP') { togglePause(); return; }
   if (paused || gameOver) return;
+
+  if (aiming) {
+    switch (e.code) {
+      case 'ArrowLeft':  aimX = Math.max(0, aimX - 1); break;
+      case 'ArrowRight': aimX = Math.min(COLS - 1, aimX + 1); break;
+      case 'ArrowUp':    aimY = Math.max(0, aimY - 1); break;
+      case 'ArrowDown':  aimY = Math.min(ROWS - 1, aimY + 1); break;
+      case 'Space':      e.preventDefault(); fireLightning(); break;
+    }
+    return;
+  }
+
   switch (e.code) {
     case 'ArrowLeft':
       if (!collide(current.shape, current.x - 1, current.y)) current.x--;

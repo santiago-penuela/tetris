@@ -10,7 +10,10 @@
   <div class="wrapper">
     <h1 class="game-title">TETRIS</h1>
     <div class="game-container">
-      <canvas id="board" width="300" height="600"></canvas>
+      <div class="board-wrap">
+        <canvas id="board" width="300" height="600"></canvas>
+        <div id="aim-banner" class="aim-banner hidden">⚡ RAYO — <kbd>←→↑↓</kbd> apuntar · <kbd>Space</kbd> disparar</div>
+      </div>
 
       <aside class="panel">
         <div class="panel-section">
@@ -39,6 +42,7 @@
             <li><kbd>↓</kbd> bajar</li>
             <li><kbd>Space</kbd> caída</li>
             <li><kbd>P</kbd> pausa</li>
+            <li><span class="bolt">⚡</span> cada 5 líneas: apunta y borra fila + columna</li>
           </ul>
         </div>
       </aside>
