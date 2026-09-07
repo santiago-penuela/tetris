@@ -43,11 +43,37 @@ const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
 const aimBanner = document.getElementById('aim-banner');
 const themeToggleBtn = document.getElementById('theme-toggle');
+const pauseMenu = document.getElementById('pause-menu');
+const resumeBtn = document.getElementById('resume-btn');
+const pauseRestartBtn = document.getElementById('pause-restart-btn');
+const controlsBtn = document.getElementById('controls-btn');
+const controlsList = document.getElementById('controls-list');
+const startLevelSelect = document.getElementById('start-level-select');
 
 const THEME_KEY = 'tetris-theme';
+const START_LEVEL_KEY = 'tetris-start-level';
+const MAX_START_LEVEL = 15;
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 let pendingLightning, lightningMilestone, aiming, aimX, aimY;
+
+let startLevel = clampStartLevel(parseInt(localStorage.getItem(START_LEVEL_KEY), 10) || 1);
+let levelOffset = 0;
+
+function clampStartLevel(n) {
+  if (!Number.isFinite(n)) return 1;
+  return Math.min(MAX_START_LEVEL, Math.max(1, Math.floor(n)));
+}
+
+function buildStartLevelOptions() {
+  for (let i = 1; i <= MAX_START_LEVEL; i++) {
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    opt.textContent = String(i);
+    startLevelSelect.appendChild(opt);
+  }
+  startLevelSelect.value = String(startLevel);
+}
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -104,7 +130,7 @@ function registerClearedLines(cleared) {
   if (!cleared) return;
   lines += cleared;
   score += (LINE_SCORES[cleared] || 0) * level;
-  level = Math.floor(lines / 10) + 1;
+  level = Math.floor(lines / 10) + 1 + levelOffset;
   dropInterval = Math.max(100, 1000 - (level - 1) * 90);
   if (Math.floor(lines / LIGHTNING_EVERY) > lightningMilestone) {
     lightningMilestone = Math.floor(lines / LIGHTNING_EVERY);
@@ -306,15 +332,22 @@ function endGame() {
 
 function togglePause() {
   if (gameOver || aiming) return;
-  paused = !paused;
-  if (!paused) {
+  setPaused(!paused);
+}
+
+function setPaused(value) {
+  if (gameOver || aiming) return;
+  paused = value;
+  if (paused) {
+    cancelAnimationFrame(animId);
+    controlsList.classList.add('hidden');
+    startLevelSelect.value = String(startLevel);
+    pauseMenu.classList.remove('hidden');
+  } else {
+    pauseMenu.classList.add('hidden');
+    controlsList.classList.add('hidden');
     lastTime = performance.now();
     loop(lastTime);
-  } else {
-    cancelAnimationFrame(animId);
-    overlayTitle.textContent = 'PAUSA';
-    overlayScore.textContent = '';
-    overlay.classList.remove('hidden');
   }
 }
 
@@ -340,10 +373,11 @@ function init() {
   board = createBoard();
   score = 0;
   lines = 0;
-  level = 1;
+  levelOffset = startLevel - 1;
+  level = 1 + levelOffset;
   paused = false;
   gameOver = false;
-  dropInterval = 1000;
+  dropInterval = Math.max(100, 1000 - (level - 1) * 90);
   dropAccum = 0;
   pendingLightning = false;
   lightningMilestone = 0;
@@ -353,13 +387,15 @@ function init() {
   spawn();
   updateHUD();
   overlay.classList.add('hidden');
+  pauseMenu.classList.add('hidden');
+  controlsList.classList.add('hidden');
   aimBanner.classList.add('hidden');
   cancelAnimationFrame(animId);
   animId = requestAnimationFrame(loop);
 }
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'KeyP') { togglePause(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
   if (paused || gameOver) return;
 
   if (aiming) {
@@ -396,6 +432,25 @@ document.addEventListener('keydown', e => {
 });
 
 restartBtn.addEventListener('click', init);
+
+buildStartLevelOptions();
+
+resumeBtn.addEventListener('click', () => setPaused(false));
+
+pauseRestartBtn.addEventListener('click', () => {
+  paused = false;
+  init();
+});
+
+controlsBtn.addEventListener('click', () => {
+  controlsList.classList.toggle('hidden');
+});
+
+startLevelSelect.addEventListener('change', () => {
+  startLevel = clampStartLevel(parseInt(startLevelSelect.value, 10));
+  startLevelSelect.value = String(startLevel);
+  localStorage.setItem(START_LEVEL_KEY, String(startLevel));
+});
 
 function applyTheme(theme) {
   document.body.classList.toggle('light-theme', theme === 'light');
