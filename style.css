@@ -236,7 +236,8 @@ kbd {
   align-items: center;
 }
 
-#overlay-title {
+#overlay-title,
+.overlay-title-text {
   font-size: 28px;
   font-weight: 800;
   letter-spacing: 4px;
@@ -357,4 +358,124 @@ kbd {
 
 .pause-controls.hidden {
   display: none;
+}
+
+/* ---- Records ---- */
+.records {
+  width: 240px;
+  max-width: 80vw;
+}
+
+.records-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.records-table th {
+  color: var(--label-color);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-align: left;
+  padding: 2px 6px;
+  border-bottom: 1px solid var(--board-border);
+}
+
+.records-table td {
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--grid-color);
+}
+
+.records-table td:nth-child(3),
+.records-table td:nth-child(4) {
+  text-align: right;
+}
+
+.records-table tr.hi td {
+  color: var(--value-color);
+  font-weight: 700;
+  background: var(--overlay-bg);
+}
+
+.records-empty {
+  text-align: center;
+  color: var(--controls-color);
+  font-style: italic;
+}
+
+.records-meta {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--controls-color);
+  text-align: center;
+}
+
+.records-meta b {
+  color: var(--value-color);
+}
+
+.newrecord {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.newrecord.hidden {
+  display: none;
+}
+
+.newrecord-msg {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--overlay-title);
+}
+
+.name-form {
+  display: flex;
+  gap: 6px;
+}
+
+#name-input {
+  background: var(--kbd-bg);
+  border: 1px solid var(--kbd-border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--text);
+  width: 140px;
+}
+
+#save-score-btn {
+  background: var(--restart-bg);
+  color: var(--restart-color);
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#save-score-btn:hover {
+  background: var(--restart-hover);
+}
+
+.secondary-btn {
+  background: transparent;
+  color: var(--controls-color);
+  border: 1px solid var(--board-border);
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 12px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.secondary-btn:hover {
+  color: var(--text);
+  background: var(--kbd-bg);
 }
